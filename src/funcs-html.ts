@@ -7,7 +7,14 @@ enum EncodeTarget {
   Html = 0,
   Url = 1,
 }
-
+/**
+ * 创建标签的左标签 - 改造
+ * 创建一个映射关系把html标签映射成RN组件
+ * eg: h1 -> text + style
+ * @param tag
+ * @param attrs
+ * @returns
+ */
 function makeStartTag(
   tag: any,
   attrs: ITagKeyValue | ITagKeyValue[] | undefined = undefined
@@ -19,22 +26,98 @@ function makeStartTag(
   var attrsStr = '';
   if (attrs) {
     var arrAttrs = ([] as ITagKeyValue[]).concat(attrs);
-    attrsStr = arrAttrs
-      .map(function (attr: any) {
-        return attr.key + (attr.value ? '="' + attr.value + '"' : '');
-      })
-      .join(' ');
+    if (arrAttrs.length > 0) {
+      attrsStr = arrAttrs
+        .map(function (attr: any) {
+          /**将class变成style完成样式替换 */
+          return (
+            attr.key +
+            (attr.value
+              ? (attr.key === 'style' ? '={styles.' : '={') +
+                convertToRNStyle(tag, attr.value) +
+                '}'
+              : '')
+          );
+        })
+        .join(' ');
+    } else {
+      const rnStyle = convertToRNStyle(tag);
+      attrsStr = rnStyle ? `style${convertToRNStyle(tag)}` : '';
+    }
   }
 
   var closing = '>';
   if (tag === 'img' || tag === 'br') {
     closing = '/>';
   }
-  return attrsStr ? `<${tag} ${attrsStr}${closing}` : `<${tag}${closing}`;
+  function handleAdditionalTag(tag: string) {
+    // if (tag === 'p') {
+    //   return '<Text>'
+    // }
+    return '';
+  }
+  console.log(40, tag, attrsStr);
+  return attrsStr
+    ? `<${convertToRNTag(tag)} ${attrsStr}${closing}` + handleAdditionalTag(tag)
+    : `<${convertToRNTag(tag)}${closing}`;
+}
+/**
+ * 将html标签替换成rn标签
+ * @param tag
+ * @returns
+ */
+function convertToRNTag(tag: string) {
+  switch (tag) {
+    case 'p':
+      return 'View';
+    case 'iframe':
+      return 'Video';
+    case 'img':
+      return 'Image';
+    default:
+      return 'Text';
+  }
+}
+/**
+ * 将富文本中的语义化标签转成rn中的样式
+ * @param tag
+ * @param attr
+ * @returns
+ */
+function convertToRNStyle(tag: string, attr: string = '') {
+  switch (tag) {
+    case 'strong':
+      return '={styles.textStrong}';
+    case 'h1' || 'h2' || 'h3' || 'h4' || 'h5':
+      return '={styles.textHeader}';
+    default:
+      return toCamelCase(attr);
+  }
+}
+/**
+ * class类名变成小驼峰
+ * @param str
+ * @returns
+ */
+function toCamelCase(str: string) {
+  return str.replace(/-([a-z])/g, function (match: any, p1: string) {
+    return p1.toUpperCase();
+  });
 }
 
-function makeEndTag(tag: any = '') {
-  return (tag && `</${tag}>`) || '';
+function makeEndTag(
+  tag: any = '',
+  attrs: ITagKeyValue | ITagKeyValue[] | undefined = undefined
+) {
+  function handleAdditionalTag(tag: string) {
+    // if (attrs) {
+    //   if (tag === 'p') {
+    //     return '</Text>'
+    //   }
+    // }
+    return '';
+  }
+  return (tag && handleAdditionalTag(tag) + `</${convertToRNTag(tag)}>`) || '';
 }
 
 function decodeHtml(str: string) {

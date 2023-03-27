@@ -22,6 +22,31 @@ import * as obj from './helpers/object';
  *  ]
  */
 
+/**
+ * 识别出多个连续的换行符并合并到一个obj
+ * @param arr
+ * @returns
+ */
+function mergeLineBreaks(arr: any) {
+  let result = [];
+  let count = 0;
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] === '\n') {
+      count++;
+    } else {
+      if (count > 0) {
+        result.push('\n'.repeat(count));
+        count = 0;
+      }
+      result.push(arr[i]);
+    }
+  }
+  if (count > 0) {
+    result.push('\n'.repeat(count));
+  }
+  return result;
+}
+
 class InsertOpDenormalizer {
   static denormalize(op: any): any[] {
     if (!op || typeof op !== 'object') {
@@ -33,7 +58,7 @@ class InsertOpDenormalizer {
     }
 
     let newlinedArray = str.tokenizeWithNewLines(op.insert + '');
-
+    newlinedArray = mergeLineBreaks(newlinedArray);
     if (newlinedArray.length === 1) {
       return [op];
     }

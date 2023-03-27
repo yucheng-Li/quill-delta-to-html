@@ -30,6 +30,7 @@ interface IQuillDeltaToHtmlConverterOptions
     IOpToHtmlConverterOptions {
   orderedListTag?: string;
   bulletListTag?: string;
+  textTag?: string;
 
   multiLineBlockquote?: boolean;
   multiLineHeader?: boolean;
@@ -38,8 +39,8 @@ interface IQuillDeltaToHtmlConverterOptions
   multiLineCustomBlock?: boolean;
 }
 
-const BrTag = '<br/>';
-
+const BrTag = "<Text style={styles.brTag}>{'\\n'}</Text>";
+const BlankLineTag = "<Text style={styles.blankLineTag}>{'\\n'}</Text>";
 class QuillDeltaToHtmlConverter {
   private options: IQuillDeltaToHtmlConverterOptions;
   private rawDeltaOps: any[] = [];
@@ -52,6 +53,7 @@ class QuillDeltaToHtmlConverter {
     this.options = obj.assign(
       {
         paragraphTag: 'p',
+        textTag: 'span',
         encodeHtml: true,
         classPrefix: 'ql',
         inlineStyles: false,
@@ -108,7 +110,10 @@ class QuillDeltaToHtmlConverter {
       ? this.options.bulletListTag + ''
       : '';
   }
-
+  /**
+   * 将data区分为不同类型的区块
+   * @returns
+   */
   getGroupedOps(): TDataGroup[] {
     var deltaOps = InsertOpsConverter.convert(this.rawDeltaOps, this.options);
 
@@ -257,9 +262,17 @@ class QuillDeltaToHtmlConverter {
   _renderBlock(bop: DeltaInsertOp, ops: DeltaInsertOp[]) {
     var converter = new OpToHtmlConverter(bop, this.converterOptions);
     var htmlParts = converter.getHtmlParts();
+    let startParaTag = makeStartTag(this.options.paragraphTag, [
+      {
+        key: 'style',
+        value: 'blockGroup',
+      },
+    ]);
+    let endParaTag = makeEndTag(this.options.paragraphTag);
 
     if (bop.isCodeBlock()) {
       return (
+        startParaTag +
         htmlParts.openingTag +
         encodeHtml(
           ops
@@ -270,14 +283,26 @@ class QuillDeltaToHtmlConverter {
             )
             .join('')
         ) +
-        htmlParts.closingTag
+        htmlParts.closingTag +
+        endParaTag
       );
     }
 
     var inlines = ops.map((op) => this._renderInline(op, bop)).join('');
-    return htmlParts.openingTag + (inlines || BrTag) + htmlParts.closingTag;
+    return (
+      startParaTag +
+      htmlParts.openingTag +
+      (inlines || BrTag) +
+      htmlParts.closingTag +
+      endParaTag
+    );
   }
-
+  /**
+   * 渲染内联块
+   * @param ops
+   * @param isInlineGroup
+   * @returns
+   */
   _renderInlines(ops: DeltaInsertOp[], isInlineGroup = true) {
     var opsLen = ops.length - 1;
     var html = ops
@@ -292,21 +317,48 @@ class QuillDeltaToHtmlConverter {
       return html;
     }
 
-    let startParaTag = makeStartTag(this.options.paragraphTag);
+    let startParaTag = makeStartTag(this.options.paragraphTag, [
+      {
+        key: 'style',
+        value: 'inlineGroup',
+      },
+    ]);
+    // let startParaTag = makeStartTag(this.options.paragraphTag);
     let endParaTag = makeEndTag(this.options.paragraphTag);
+    let startTextTag = makeStartTag(this.options.textTag);
+    let endTextTag = makeEndTag(this.options.textTag);
     if (html === BrTag || this.options.multiLineParagraph) {
-      return startParaTag + html + endParaTag;
+      return startParaTag + startTextTag + html + endTextTag + endParaTag;
     }
     return (
       startParaTag +
+      startTextTag +
       html
         .split(BrTag)
         .map((v) => {
           return v === '' ? BrTag : v;
         })
         .join(endParaTag + startParaTag) +
+      endTextTag +
       endParaTag
     );
+  }
+  /**
+   * 单行换行和多行换行的标签替换
+   * @param htmlString
+   * @returns
+   */
+  replaceTags(htmlString: string) {
+    const singleNewLineRegex = /\n/g;
+    const multipleNewLineRegex = /\n+/g;
+    const brTag = BrTag;
+    const blankLineTag = BlankLineTag;
+
+    return htmlString
+      .replace(multipleNewLineRegex, (match) => {
+        return brTag + blankLineTag.repeat(match.length - 1);
+      })
+      .replace(singleNewLineRegex, brTag);
   }
 
   _renderInline(op: DeltaInsertOp, contextOp: DeltaInsertOp | null) {
@@ -314,7 +366,8 @@ class QuillDeltaToHtmlConverter {
       return this._renderCustom(op, contextOp);
     }
     var converter = new OpToHtmlConverter(op, this.converterOptions);
-    return converter.getHtml().replace(/\n/g, BrTag);
+
+    return this.replaceTags(converter.getHtml());
   }
 
   _renderCustom(op: DeltaInsertOp, contextOp: DeltaInsertOp | null) {

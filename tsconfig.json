@@ -18,10 +18,10 @@
       "noImplicitAny": true,
       "strictNullChecks": true,
       "alwaysStrict": true,
-      "noUnusedParameters": true,
+      "noUnusedParameters": false,
       "noUnusedLocals": true,
       "noFallthroughCasesInSwitch": true,
-      "esModuleInterop": true
+      "esModuleInterop": true,
    },
    "include": [
       "src/**/*.ts"

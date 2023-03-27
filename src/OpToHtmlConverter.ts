@@ -102,7 +102,10 @@ class OpToHtmlConverter {
     var parts = this.getHtmlParts();
     return parts.openingTag + parts.content + parts.closingTag;
   }
-
+  /**
+   * 标签元素拆解
+   * @returns
+   */
   getHtmlParts(): IHtmlParts {
     if (this.op.isJustNewline() && !this.op.isContainerBlock()) {
       return { openingTag: '', closingTag: '', content: NewLine };
@@ -125,7 +128,7 @@ class OpToHtmlConverter {
         beginTags.push(makeStartTag('a', this.getLinkAttrs()));
       }
       beginTags.push(makeStartTag(tag, attrs));
-      endTags.push(tag === 'img' ? '' : makeEndTag(tag));
+      endTags.push(tag === 'img' ? '' : makeEndTag(tag, attrs));
       if (isImageLink(tag)) {
         endTags.push(makeEndTag('a'));
       }
@@ -245,7 +248,7 @@ class OpToHtmlConverter {
       : [];
     var classes = this.getCssClasses();
     var tagAttrs = classes.length
-      ? customAttr.concat([makeAttr('class', classes.join(' '))])
+      ? customAttr.concat([makeAttr('style', classes.join(' '))])
       : customAttr;
 
     if (this.op.isImage()) {
@@ -253,7 +256,9 @@ class OpToHtmlConverter {
         (tagAttrs = tagAttrs.concat(
           makeAttr('width', this.op.attributes.width)
         ));
-      return tagAttrs.concat(makeAttr('src', this.op.insert.value));
+      return tagAttrs.concat(
+        makeAttr('source', `{uri: '${this.op.insert.value}'}`)
+      );
     }
 
     if (this.op.isACheckList()) {
@@ -268,9 +273,9 @@ class OpToHtmlConverter {
 
     if (this.op.isVideo()) {
       return tagAttrs.concat(
-        makeAttr('frameborder', '0'),
-        makeAttr('allowfullscreen', 'true'),
-        makeAttr('src', this.op.insert.value)
+        // makeAttr('frameborder', '0'),
+        // makeAttr('allowfullscreen', 'true'),
+        makeAttr('source', `{uri: '${this.op.insert.value}'}`)
       );
     }
 
@@ -290,6 +295,17 @@ class OpToHtmlConverter {
         tagAttrs = tagAttrs.concat(makeAttr('target', mention.target));
       }
       return tagAttrs;
+    }
+    if (this.op.isText()) {
+      const isAllNewline = (str: string) => {
+        return /^[\n]+$/.test(str);
+      };
+      if (
+        Object.keys(this.op.attributes).length === 0 &&
+        !isAllNewline(this.op.insert.value)
+      ) {
+        tagAttrs = tagAttrs.concat(makeAttr('style', 'pure-text'));
+      }
     }
 
     var styles = this.getCssStyles();
