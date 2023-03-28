@@ -390,7 +390,7 @@ class OpToHtmlConverter {
     // embeds
     if (!this.op.isText()) {
       return [
-        this.op.isVideo() ? 'iframe' : this.op.isImage() ? 'img' : 'span', // formula
+        this.op.isVideo() ? 'video' : this.op.isImage() ? 'img' : 'span', // formula
       ];
     }
 
