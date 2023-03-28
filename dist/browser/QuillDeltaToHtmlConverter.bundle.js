@@ -168,6 +168,26 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var value_types_1 = require("./value-types");
 var str = __importStar(require("./helpers/string"));
 var obj = __importStar(require("./helpers/object"));
+function mergeLineBreaks(arr) {
+    var result = [];
+    var count = 0;
+    for (var i = 0; i < arr.length; i++) {
+        if (arr[i] === '\n') {
+            count++;
+        }
+        else {
+            if (count > 0) {
+                result.push('\n'.repeat(count));
+                count = 0;
+            }
+            result.push(arr[i]);
+        }
+    }
+    if (count > 0) {
+        result.push('\n'.repeat(count));
+    }
+    return result;
+}
 var InsertOpDenormalizer = (function () {
     function InsertOpDenormalizer() {
     }
@@ -179,6 +199,7 @@ var InsertOpDenormalizer = (function () {
             return [op];
         }
         var newlinedArray = str.tokenizeWithNewLines(op.insert + '');
+        newlinedArray = mergeLineBreaks(newlinedArray);
         if (newlinedArray.length === 1) {
             return [op];
         }
@@ -519,7 +540,7 @@ var OpToHtmlConverter = (function () {
                 beginTags.push(funcs_html_1.makeStartTag('a', this.getLinkAttrs()));
             }
             beginTags.push(funcs_html_1.makeStartTag(tag, attrs));
-            endTags.push(tag === 'img' ? '' : funcs_html_1.makeEndTag(tag));
+            endTags.push(tag === 'img' ? '' : funcs_html_1.makeEndTag(tag, attrs));
             if (isImageLink(tag)) {
                 endTags.push(funcs_html_1.makeEndTag('a'));
             }
@@ -615,12 +636,12 @@ var OpToHtmlConverter = (function () {
             : [];
         var classes = this.getCssClasses();
         var tagAttrs = classes.length
-            ? customAttr.concat([makeAttr('class', classes.join(' '))])
+            ? customAttr.concat([makeAttr('style', classes.join(' '))])
             : customAttr;
         if (this.op.isImage()) {
             this.op.attributes.width &&
                 (tagAttrs = tagAttrs.concat(makeAttr('width', this.op.attributes.width)));
-            return tagAttrs.concat(makeAttr('src', this.op.insert.value));
+            return tagAttrs.concat(makeAttr('source', "{uri: '" + this.op.insert.value + "'}"));
         }
         if (this.op.isACheckList()) {
             return tagAttrs.concat(makeAttr('data-checked', this.op.isCheckedList() ? 'true' : 'false'));
@@ -629,7 +650,7 @@ var OpToHtmlConverter = (function () {
             return tagAttrs;
         }
         if (this.op.isVideo()) {
-            return tagAttrs.concat(makeAttr('frameborder', '0'), makeAttr('allowfullscreen', 'true'), makeAttr('src', this.op.insert.value));
+            return tagAttrs.concat(makeAttr('source', "{uri: '" + this.op.insert.value + "'}"));
         }
         if (this.op.isMentions()) {
             var mention = this.op.attributes.mention;
@@ -646,6 +667,15 @@ var OpToHtmlConverter = (function () {
                 tagAttrs = tagAttrs.concat(makeAttr('target', mention.target));
             }
             return tagAttrs;
+        }
+        if (this.op.isText()) {
+            var isAllNewline = function (str) {
+                return /^[\n]+$/.test(str);
+            };
+            if (Object.keys(this.op.attributes).length === 0 &&
+                !isAllNewline(this.op.insert.value)) {
+                tagAttrs = tagAttrs.concat(makeAttr('style', 'pure-text'));
+            }
         }
         var styles = this.getCssStyles();
         if (styles.length) {
@@ -797,13 +827,15 @@ var funcs_html_1 = require("./funcs-html");
 var obj = __importStar(require("./helpers/object"));
 var value_types_1 = require("./value-types");
 var TableGrouper_1 = require("./grouper/TableGrouper");
-var BrTag = '<br/>';
+var BrTag = "<Text style={styles.brTag}>{'\\n'}</Text>";
+var BlankLineTag = "<Text style={styles.blankLineTag}>{'\\n'}</Text>";
 var QuillDeltaToHtmlConverter = (function () {
     function QuillDeltaToHtmlConverter(deltaOps, options) {
         this.rawDeltaOps = [];
         this.callbacks = {};
         this.options = obj.assign({
             paragraphTag: 'p',
+            textTag: 'span',
             encodeHtml: true,
             classPrefix: 'ql',
             inlineStyles: false,
@@ -975,8 +1007,16 @@ var QuillDeltaToHtmlConverter = (function () {
         var _this = this;
         var converter = new OpToHtmlConverter_1.OpToHtmlConverter(bop, this.converterOptions);
         var htmlParts = converter.getHtmlParts();
+        var startParaTag = funcs_html_1.makeStartTag(this.options.paragraphTag, [
+            {
+                key: 'style',
+                value: 'blockGroup',
+            },
+        ]);
+        var endParaTag = funcs_html_1.makeEndTag(this.options.paragraphTag);
         if (bop.isCodeBlock()) {
-            return (htmlParts.openingTag +
+            return (startParaTag +
+                htmlParts.openingTag +
                 funcs_html_1.encodeHtml(ops
                     .map(function (iop) {
                     return iop.isCustomEmbed()
@@ -984,10 +1024,15 @@ var QuillDeltaToHtmlConverter = (function () {
                         : iop.insert.value;
                 })
                     .join('')) +
-                htmlParts.closingTag);
+                htmlParts.closingTag +
+                endParaTag);
         }
         var inlines = ops.map(function (op) { return _this._renderInline(op, bop); }).join('');
-        return htmlParts.openingTag + (inlines || BrTag) + htmlParts.closingTag;
+        return (startParaTag +
+            htmlParts.openingTag +
+            (inlines || BrTag) +
+            htmlParts.closingTag +
+            endParaTag);
     };
     QuillDeltaToHtmlConverter.prototype._renderInlines = function (ops, isInlineGroup) {
         var _this = this;
@@ -1004,26 +1049,46 @@ var QuillDeltaToHtmlConverter = (function () {
         if (!isInlineGroup) {
             return html;
         }
-        var startParaTag = funcs_html_1.makeStartTag(this.options.paragraphTag);
+        var startParaTag = funcs_html_1.makeStartTag(this.options.paragraphTag, [
+            {
+                key: 'style',
+                value: 'inlineGroup',
+            },
+        ]);
         var endParaTag = funcs_html_1.makeEndTag(this.options.paragraphTag);
+        var startTextTag = funcs_html_1.makeStartTag(this.options.textTag);
+        var endTextTag = funcs_html_1.makeEndTag(this.options.textTag);
         if (html === BrTag || this.options.multiLineParagraph) {
-            return startParaTag + html + endParaTag;
+            return startParaTag + startTextTag + html + endTextTag + endParaTag;
         }
         return (startParaTag +
+            startTextTag +
             html
                 .split(BrTag)
                 .map(function (v) {
                 return v === '' ? BrTag : v;
             })
                 .join(endParaTag + startParaTag) +
+            endTextTag +
             endParaTag);
+    };
+    QuillDeltaToHtmlConverter.prototype.replaceTags = function (htmlString) {
+        var singleNewLineRegex = /\n/g;
+        var multipleNewLineRegex = /\n+/g;
+        var brTag = BrTag;
+        var blankLineTag = BlankLineTag;
+        return htmlString
+            .replace(multipleNewLineRegex, function (match) {
+            return brTag + blankLineTag.repeat(match.length - 1);
+        })
+            .replace(singleNewLineRegex, brTag);
     };
     QuillDeltaToHtmlConverter.prototype._renderInline = function (op, contextOp) {
         if (op.isCustomEmbed()) {
             return this._renderCustom(op, contextOp);
         }
         var converter = new OpToHtmlConverter_1.OpToHtmlConverter(op, this.converterOptions);
-        return converter.getHtml().replace(/\n/g, BrTag);
+        return this.replaceTags(converter.getHtml());
     };
     QuillDeltaToHtmlConverter.prototype._renderCustom = function (op, contextOp) {
         var renderCb = this.callbacks['renderCustomOp_cb'];
@@ -1065,22 +1130,71 @@ function makeStartTag(tag, attrs) {
     var attrsStr = '';
     if (attrs) {
         var arrAttrs = [].concat(attrs);
-        attrsStr = arrAttrs
-            .map(function (attr) {
-            return attr.key + (attr.value ? '="' + attr.value + '"' : '');
-        })
-            .join(' ');
+        if (arrAttrs.length > 0) {
+            attrsStr = arrAttrs
+                .map(function (attr) {
+                return (attr.key +
+                    (attr.value
+                        ? (attr.key === 'style' ? '={styles.' : '={') +
+                            convertToRNStyle(tag, attr.value) +
+                            '}'
+                        : ''));
+            })
+                .join(' ');
+        }
+        else {
+            var rnStyle = convertToRNStyle(tag);
+            attrsStr = rnStyle ? "style" + convertToRNStyle(tag) : '';
+        }
     }
     var closing = '>';
     if (tag === 'img' || tag === 'br') {
         closing = '/>';
     }
-    return attrsStr ? "<" + tag + " " + attrsStr + closing : "<" + tag + closing;
+    function handleAdditionalTag(tag) {
+        return '';
+    }
+    console.log(40, tag, attrsStr);
+    return attrsStr
+        ? "<" + convertToRNTag(tag) + " " + attrsStr + closing + handleAdditionalTag(tag)
+        : "<" + convertToRNTag(tag) + closing;
 }
 exports.makeStartTag = makeStartTag;
-function makeEndTag(tag) {
+function convertToRNTag(tag) {
+    switch (tag) {
+        case 'p':
+            return 'View';
+        case 'iframe':
+            return 'Video';
+        case 'img':
+            return 'Image';
+        default:
+            return 'Text';
+    }
+}
+function convertToRNStyle(tag, attr) {
+    if (attr === void 0) { attr = ''; }
+    switch (tag) {
+        case 'strong':
+            return '={styles.textStrong}';
+        case 'h1' || 'h2' || 'h3' || 'h4' || 'h5':
+            return '={styles.textHeader}';
+        default:
+            return toCamelCase(attr);
+    }
+}
+function toCamelCase(str) {
+    return str.replace(/-([a-z])/g, function (match, p1) {
+        return p1.toUpperCase();
+    });
+}
+function makeEndTag(tag, attrs) {
     if (tag === void 0) { tag = ''; }
-    return (tag && "</" + tag + ">") || '';
+    if (attrs === void 0) { attrs = undefined; }
+    function handleAdditionalTag(tag) {
+        return '';
+    }
+    return (tag && handleAdditionalTag(tag) + ("</" + convertToRNTag(tag) + ">")) || '';
 }
 exports.makeEndTag = makeEndTag;
 function decodeHtml(str) {

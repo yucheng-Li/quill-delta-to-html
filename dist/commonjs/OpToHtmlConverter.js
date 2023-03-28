@@ -78,7 +78,7 @@ var OpToHtmlConverter = (function () {
                 beginTags.push(funcs_html_1.makeStartTag('a', this.getLinkAttrs()));
             }
             beginTags.push(funcs_html_1.makeStartTag(tag, attrs));
-            endTags.push(tag === 'img' ? '' : funcs_html_1.makeEndTag(tag));
+            endTags.push(tag === 'img' ? '' : funcs_html_1.makeEndTag(tag, attrs));
             if (isImageLink(tag)) {
                 endTags.push(funcs_html_1.makeEndTag('a'));
             }
@@ -174,12 +174,12 @@ var OpToHtmlConverter = (function () {
             : [];
         var classes = this.getCssClasses();
         var tagAttrs = classes.length
-            ? customAttr.concat([makeAttr('class', classes.join(' '))])
+            ? customAttr.concat([makeAttr('style', classes.join(' '))])
             : customAttr;
         if (this.op.isImage()) {
             this.op.attributes.width &&
                 (tagAttrs = tagAttrs.concat(makeAttr('width', this.op.attributes.width)));
-            return tagAttrs.concat(makeAttr('src', this.op.insert.value));
+            return tagAttrs.concat(makeAttr('source', "{uri: '" + this.op.insert.value + "'}"));
         }
         if (this.op.isACheckList()) {
             return tagAttrs.concat(makeAttr('data-checked', this.op.isCheckedList() ? 'true' : 'false'));
@@ -188,7 +188,7 @@ var OpToHtmlConverter = (function () {
             return tagAttrs;
         }
         if (this.op.isVideo()) {
-            return tagAttrs.concat(makeAttr('frameborder', '0'), makeAttr('allowfullscreen', 'true'), makeAttr('src', this.op.insert.value));
+            return tagAttrs.concat(makeAttr('source', "{uri: '" + this.op.insert.value + "'}"));
         }
         if (this.op.isMentions()) {
             var mention = this.op.attributes.mention;
@@ -205,6 +205,15 @@ var OpToHtmlConverter = (function () {
                 tagAttrs = tagAttrs.concat(makeAttr('target', mention.target));
             }
             return tagAttrs;
+        }
+        if (this.op.isText()) {
+            var isAllNewline = function (str) {
+                return /^[\n]+$/.test(str);
+            };
+            if (Object.keys(this.op.attributes).length === 0 &&
+                !isAllNewline(this.op.insert.value)) {
+                tagAttrs = tagAttrs.concat(makeAttr('style', 'pure-text'));
+            }
         }
         var styles = this.getCssStyles();
         if (styles.length) {

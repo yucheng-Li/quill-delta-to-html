@@ -15,6 +15,7 @@ interface IQuillDeltaToHtmlConverterOptions
     IOpToHtmlConverterOptions {
   orderedListTag?: string;
   bulletListTag?: string;
+  textTag?: string;
   multiLineBlockquote?: boolean;
   multiLineHeader?: boolean;
   multiLineCodeblock?: boolean;
@@ -42,6 +43,7 @@ declare class QuillDeltaToHtmlConverter {
   _renderTableCell(cell: TableCell): string;
   _renderBlock(bop: DeltaInsertOp, ops: DeltaInsertOp[]): string;
   _renderInlines(ops: DeltaInsertOp[], isInlineGroup?: boolean): string;
+  replaceTags(htmlString: string): string;
   _renderInline(op: DeltaInsertOp, contextOp: DeltaInsertOp | null): any;
   _renderCustom(op: DeltaInsertOp, contextOp: DeltaInsertOp | null): any;
   beforeRender(cb: (group: GroupType, data: TDataGroup) => string): void;

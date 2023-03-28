@@ -6,7 +6,10 @@ declare function makeStartTag(
   tag: any,
   attrs?: ITagKeyValue | ITagKeyValue[] | undefined
 ): string;
-declare function makeEndTag(tag?: any): string;
+declare function makeEndTag(
+  tag?: any,
+  attrs?: ITagKeyValue | ITagKeyValue[] | undefined
+): string;
 declare function decodeHtml(str: string): string;
 declare function encodeHtml(
   str: string,

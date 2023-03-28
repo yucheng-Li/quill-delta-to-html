@@ -16,13 +16,15 @@ var funcs_html_1 = require("./funcs-html");
 var obj = __importStar(require("./helpers/object"));
 var value_types_1 = require("./value-types");
 var TableGrouper_1 = require("./grouper/TableGrouper");
-var BrTag = '<br/>';
+var BrTag = "<Text style={styles.brTag}>{'\\n'}</Text>";
+var BlankLineTag = "<Text style={styles.blankLineTag}>{'\\n'}</Text>";
 var QuillDeltaToHtmlConverter = (function () {
     function QuillDeltaToHtmlConverter(deltaOps, options) {
         this.rawDeltaOps = [];
         this.callbacks = {};
         this.options = obj.assign({
             paragraphTag: 'p',
+            textTag: 'span',
             encodeHtml: true,
             classPrefix: 'ql',
             inlineStyles: false,
@@ -194,8 +196,16 @@ var QuillDeltaToHtmlConverter = (function () {
         var _this = this;
         var converter = new OpToHtmlConverter_1.OpToHtmlConverter(bop, this.converterOptions);
         var htmlParts = converter.getHtmlParts();
+        var startParaTag = funcs_html_1.makeStartTag(this.options.paragraphTag, [
+            {
+                key: 'style',
+                value: 'blockGroup',
+            },
+        ]);
+        var endParaTag = funcs_html_1.makeEndTag(this.options.paragraphTag);
         if (bop.isCodeBlock()) {
-            return (htmlParts.openingTag +
+            return (startParaTag +
+                htmlParts.openingTag +
                 funcs_html_1.encodeHtml(ops
                     .map(function (iop) {
                     return iop.isCustomEmbed()
@@ -203,10 +213,15 @@ var QuillDeltaToHtmlConverter = (function () {
                         : iop.insert.value;
                 })
                     .join('')) +
-                htmlParts.closingTag);
+                htmlParts.closingTag +
+                endParaTag);
         }
         var inlines = ops.map(function (op) { return _this._renderInline(op, bop); }).join('');
-        return htmlParts.openingTag + (inlines || BrTag) + htmlParts.closingTag;
+        return (startParaTag +
+            htmlParts.openingTag +
+            (inlines || BrTag) +
+            htmlParts.closingTag +
+            endParaTag);
     };
     QuillDeltaToHtmlConverter.prototype._renderInlines = function (ops, isInlineGroup) {
         var _this = this;
@@ -223,26 +238,46 @@ var QuillDeltaToHtmlConverter = (function () {
         if (!isInlineGroup) {
             return html;
         }
-        var startParaTag = funcs_html_1.makeStartTag(this.options.paragraphTag);
+        var startParaTag = funcs_html_1.makeStartTag(this.options.paragraphTag, [
+            {
+                key: 'style',
+                value: 'inlineGroup',
+            },
+        ]);
         var endParaTag = funcs_html_1.makeEndTag(this.options.paragraphTag);
+        var startTextTag = funcs_html_1.makeStartTag(this.options.textTag);
+        var endTextTag = funcs_html_1.makeEndTag(this.options.textTag);
         if (html === BrTag || this.options.multiLineParagraph) {
-            return startParaTag + html + endParaTag;
+            return startParaTag + startTextTag + html + endTextTag + endParaTag;
         }
         return (startParaTag +
+            startTextTag +
             html
                 .split(BrTag)
                 .map(function (v) {
                 return v === '' ? BrTag : v;
             })
                 .join(endParaTag + startParaTag) +
+            endTextTag +
             endParaTag);
+    };
+    QuillDeltaToHtmlConverter.prototype.replaceTags = function (htmlString) {
+        var singleNewLineRegex = /\n/g;
+        var multipleNewLineRegex = /\n+/g;
+        var brTag = BrTag;
+        var blankLineTag = BlankLineTag;
+        return htmlString
+            .replace(multipleNewLineRegex, function (match) {
+            return brTag + blankLineTag.repeat(match.length - 1);
+        })
+            .replace(singleNewLineRegex, brTag);
     };
     QuillDeltaToHtmlConverter.prototype._renderInline = function (op, contextOp) {
         if (op.isCustomEmbed()) {
             return this._renderCustom(op, contextOp);
         }
         var converter = new OpToHtmlConverter_1.OpToHtmlConverter(op, this.converterOptions);
-        return converter.getHtml().replace(/\n/g, BrTag);
+        return this.replaceTags(converter.getHtml());
     };
     QuillDeltaToHtmlConverter.prototype._renderCustom = function (op, contextOp) {
         var renderCb = this.callbacks['renderCustomOp_cb'];

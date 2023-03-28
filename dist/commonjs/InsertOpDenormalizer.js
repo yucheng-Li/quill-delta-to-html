@@ -10,6 +10,26 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var value_types_1 = require("./value-types");
 var str = __importStar(require("./helpers/string"));
 var obj = __importStar(require("./helpers/object"));
+function mergeLineBreaks(arr) {
+    var result = [];
+    var count = 0;
+    for (var i = 0; i < arr.length; i++) {
+        if (arr[i] === '\n') {
+            count++;
+        }
+        else {
+            if (count > 0) {
+                result.push('\n'.repeat(count));
+                count = 0;
+            }
+            result.push(arr[i]);
+        }
+    }
+    if (count > 0) {
+        result.push('\n'.repeat(count));
+    }
+    return result;
+}
 var InsertOpDenormalizer = (function () {
     function InsertOpDenormalizer() {
     }
@@ -21,6 +41,7 @@ var InsertOpDenormalizer = (function () {
             return [op];
         }
         var newlinedArray = str.tokenizeWithNewLines(op.insert + '');
+        newlinedArray = mergeLineBreaks(newlinedArray);
         if (newlinedArray.length === 1) {
             return [op];
         }

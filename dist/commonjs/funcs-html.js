@@ -13,22 +13,71 @@ function makeStartTag(tag, attrs) {
     var attrsStr = '';
     if (attrs) {
         var arrAttrs = [].concat(attrs);
-        attrsStr = arrAttrs
-            .map(function (attr) {
-            return attr.key + (attr.value ? '="' + attr.value + '"' : '');
-        })
-            .join(' ');
+        if (arrAttrs.length > 0) {
+            attrsStr = arrAttrs
+                .map(function (attr) {
+                return (attr.key +
+                    (attr.value
+                        ? (attr.key === 'style' ? '={styles.' : '={') +
+                            convertToRNStyle(tag, attr.value) +
+                            '}'
+                        : ''));
+            })
+                .join(' ');
+        }
+        else {
+            var rnStyle = convertToRNStyle(tag);
+            attrsStr = rnStyle ? "style" + convertToRNStyle(tag) : '';
+        }
     }
     var closing = '>';
     if (tag === 'img' || tag === 'br') {
         closing = '/>';
     }
-    return attrsStr ? "<" + tag + " " + attrsStr + closing : "<" + tag + closing;
+    function handleAdditionalTag(tag) {
+        return '';
+    }
+    console.log(40, tag, attrsStr);
+    return attrsStr
+        ? "<" + convertToRNTag(tag) + " " + attrsStr + closing + handleAdditionalTag(tag)
+        : "<" + convertToRNTag(tag) + closing;
 }
 exports.makeStartTag = makeStartTag;
-function makeEndTag(tag) {
+function convertToRNTag(tag) {
+    switch (tag) {
+        case 'p':
+            return 'View';
+        case 'iframe':
+            return 'Video';
+        case 'img':
+            return 'Image';
+        default:
+            return 'Text';
+    }
+}
+function convertToRNStyle(tag, attr) {
+    if (attr === void 0) { attr = ''; }
+    switch (tag) {
+        case 'strong':
+            return '={styles.textStrong}';
+        case 'h1' || 'h2' || 'h3' || 'h4' || 'h5':
+            return '={styles.textHeader}';
+        default:
+            return toCamelCase(attr);
+    }
+}
+function toCamelCase(str) {
+    return str.replace(/-([a-z])/g, function (match, p1) {
+        return p1.toUpperCase();
+    });
+}
+function makeEndTag(tag, attrs) {
     if (tag === void 0) { tag = ''; }
-    return (tag && "</" + tag + ">") || '';
+    if (attrs === void 0) { attrs = undefined; }
+    function handleAdditionalTag(tag) {
+        return '';
+    }
+    return (tag && handleAdditionalTag(tag) + ("</" + convertToRNTag(tag) + ">")) || '';
 }
 exports.makeEndTag = makeEndTag;
 function decodeHtml(str) {
