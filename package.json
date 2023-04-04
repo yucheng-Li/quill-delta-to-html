@@ -1,7 +1,7 @@
 {
-  "name": "quill-delta-to-html",
-  "version": "0.12.1",
-  "description": "Converts Quill's delta ops to HTML",
+  "name": "quill-delta-to-react-native",
+  "version": "0.12.2",
+  "description": "Converts Quill's delta ops to react-native component",
   "main": "./dist/commonjs/main.js",
   "types": "./dist/commonjs/main.d.ts",
   "dependencies": {
